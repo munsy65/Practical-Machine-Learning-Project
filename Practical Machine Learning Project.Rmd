@@ -1,0 +1,131 @@
+---
+title: "Practical Machine Learning Project"
+author: "Mark Munsell"
+date: "September 25, 2015"
+output: html_document
+---
+##Introduction
+  
+  
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. This project will predict the manner in which the performed the exercise.  This is the "classe" variable in the training set. This report describes how the model was build, how 
+cross validation was used, and what is expected out of sample error.
+  
+##Data Load and Data Preprocessing 
+```{r message=FALSE}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(corrplot)
+```
+
+
+
+```{r, message=FALSE}
+trainUrl <-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+trainFile <- "./data/pml-training.csv"
+testFile  <- "./data/pml-testing.csv"
+if (!file.exists("./data")) {
+  dir.create("./data")
+}
+if (!file.exists(trainFile)) {
+  download.file(trainUrl, destfile=trainFile, method="curl")
+}
+if (!file.exists(testFile)) {
+  download.file(testUrl, destfile=testFile, method="curl")
+}
+```
+  
+##Reading the Data into two Data Frames  
+```{r}
+trainDat <- read.csv("./data/pml-training.csv")
+testDat <- read.csv("./data/pml-testing.csv")
+dim(trainDat)
+dim(testDat)
+
+```
+  
+The training data set contains 19622 observations and 160 variables, while the testing data set contains 20 observations and 160 variables. The “classe” variable in the training set is the outcome to predict.
+  
+##Cleaning the Data  
+```{r}
+sum(complete.cases(trainDat))
+
+```
+Removing columns that contain NA missing values.
+```{r}
+trainDat <- trainDat[, colSums(is.na(trainDat)) == 0] 
+testDat <- testDat[, colSums(is.na(testDat)) == 0] 
+
+```
+Removing columns the do not have much of an impact on the acceleromter measurements.
+```{r}
+classe <- trainDat$classe
+trainRmv <- grepl("^X|timestamp|window", names(trainDat))
+trainDat <- trainDat[, !trainRmv]
+trainCln <- trainDat[, sapply(trainDat, is.numeric)]
+trainCln$classe <- classe
+testRmv <- grepl("^X|timestamp|window", names(testDat))
+testDat <- testDat[, !testRmv]
+testCln <- testDat[, sapply(testDat, is.numeric)] 
+
+```
+The cleaned training data set contains 19622 observations and 53 variables, while the testing data set contains 20 observations and 53 variables.
+  
+##Slicing the Data  
+```{r}
+set.seed(22519) 
+trainIn <- createDataPartition(trainCln$classe, p=0.70, list=F)
+trainData <- trainCln[trainIn, ]
+testData <- trainCln[-trainIn, ]
+
+```
+This splits the cleaned training set into a pure training data set (70%) and a validation data set (30%).
+  
+##Data Modeling
+  
+This fits a predictive model for activity recognition using a Random Forest algorithm because it automatically selects important variables and is robust. Then a 5-fold cross validation is applied to the algorithm.  
+
+```{r}
+rfCont <- trainControl(method="cv", 5)
+rfModel <- train(classe ~ ., data=trainData, method="rf", trControl=rfCont, ntree=250)
+rfModel
+
+```
+
+This will estimate the performance of the model on the validation data set.
+```{r}
+rfPred <- predict(rfModel, testData)
+confusionMatrix(testData$classe, rfPred)
+
+```
+
+```{r}
+acc <- postResample(rfPred, testData$classe)
+acc
+outSampleErr <- 1 - as.numeric(confusionMatrix(testData$classe, rfPred)$overall[1])
+outSampleErr
+
+```
+  
+Estimated accuracy of the model is 99.30% and the estimated out-of-sample error is 0.69%.
+  
+##Appendix
+  
+Tree Visualization:  
+```{r}
+treeMod <- rpart(classe ~ ., data=trainData, method="class")
+prp(treeMod)
+```
+  
+Correlation Matrix Visualization:
+
+```{r}
+cMtxPlot <- cor(trainData[, -length(names(trainData))])
+corrplot(cMtxPlot, method="color")
+```
+  
+Correlation Matrix    
+  
+    
