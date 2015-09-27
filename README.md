@@ -1,4 +1,4 @@
 # Practical-Machine-Learning-Project
 
-Click the link below to view output on Rpubs.
-[Rpubs Doc](https://rpubs.com/munsy65/112767)
+Click the link  to view html output on Rpubs.
+[click](https://rpubs.com/munsy65/112767)
